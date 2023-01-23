@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "certchain"
+		},
+		{
+			"path": "certchainmain"
+		},
+		{
+			"path": "ecdsachain"
+		},
+		{
+			"path": "rsachain"
+		}
+	]
+}
