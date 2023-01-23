@@ -13,3 +13,6 @@ in the browser using the openssl x509 -text command.
 ![image](https://user-images.githubusercontent.com/117768679/214163832-e35f252e-aa77-4e9b-b5d6-b2f6e646ab25.png)
 ![image](https://user-images.githubusercontent.com/117768679/214164045-7b9a5d9c-3ada-43dc-b3d6-8c50b0c15d63.png)
 ![image](https://user-images.githubusercontent.com/117768679/214164265-744d42bc-36f8-48be-896d-39130256bf80.png)
+![image](https://user-images.githubusercontent.com/117768679/214170633-e783612b-6d9f-4179-a862-24e86724f7ec.png)
+![image](https://user-images.githubusercontent.com/117768679/214170757-2df1c7a4-08d6-47c4-9444-e8b1a316841d.png)
+![image](https://user-images.githubusercontent.com/117768679/214170909-752013aa-134e-4b61-be19-f33e494eb704.png)
