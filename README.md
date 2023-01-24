@@ -5,7 +5,7 @@ and 4096 bits are available.  For ECDSA, key sizes 256, 384, and 512 bits are av
 are created.  The backend is written in Go using the html/template package for support.  After starting the server, the user connects to URL 
 http://127.0.0.1:8080/certchain in the web browser.  The user fills in the form, being careful to select the number of intermediate CAs.  Clicking the submit button
 uploads the form data to the server.  Any errors in the form entries are highlighted in red.  Upon successful submission of the form, the certificate chain is displayed
-in the browser using the openssl x509 -text command.  A pkcs12 file is created for deployment and can be found in the certs/ folder along with the other PEM certificates.  The private/ folder contains the public and private keys in DER and PEM format.
+in the browser using the openssl x509 -text command.  A pkcs12 file is created for deployment and can be found in the certs/ folder along with the other PEM certificates.  The private/ folder contains the private keys in DER and PEM format.
 
 
 
