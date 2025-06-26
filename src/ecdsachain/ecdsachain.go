@@ -107,7 +107,7 @@ func (chain *ECDSAChain) DisplayCertificate(pemfile string, w http.ResponseWrite
 }
 
 // Create the End-entity certificate and private key and store them in the receiver chain
-func (chain *ECDSAChain) CreateEndEntity(w http.ResponseWriter) {
+func (chain *ECDSAChain) CreateEndEntity(w http.ResponseWriter, _ string) {
 	// Create End-entity CA private key
 	// Validate End-entity CA private key
 	// Create End-entity CA cert using Intermediate CA as signer
@@ -675,7 +675,7 @@ func GenerateCertChain(chain certchain.CertChain, w http.ResponseWriter) {
 	chain.CreateInterCA(w)
 
 	// Create the end-entity certificate and key
-	chain.CreateEndEntity(w)
+	chain.CreateEndEntity(w, "server")
 
 	fmt.Fprint(w, `</body>`)
 	fmt.Fprint(w, `</html>`)
