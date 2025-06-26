@@ -8,6 +8,6 @@ import "net/http"
 type CertChain interface {
 	CreateRootCA(w http.ResponseWriter)
 	CreateInterCA(w http.ResponseWriter)
-	CreateEndEntity(w http.ResponseWriter)
+	CreateEndEntity(w http.ResponseWriter, endEntity string)
 	DisplayCertificate(pemfile string, w http.ResponseWriter)
 }
