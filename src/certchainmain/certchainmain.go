@@ -22,6 +22,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"fmt"
 	"html/template"
 	"log"
@@ -377,7 +378,16 @@ func parseForm(r *http.Request) certchain.CertChain {
 			Organization:       []string{formControls["orgEndEntity"].Text},
 			OrganizationalUnit: []string{formControls["orgunitEndEntity"].Text},
 			CommonName:         formControls["cnEndEntity"].Text,
+			Names: []pkix.AttributeTypeAndValue{
+				{Type: asn1.ObjectIdentifier{2, 5, 4, 6}, Value: asn1.RawValue{Tag: asn1.TagPrintableString, Bytes: []byte(formControls["countryEndEntity"].Text)}},  // C
+				{Type: asn1.ObjectIdentifier{2, 5, 4, 8}, Value: asn1.RawValue{Tag: asn1.TagPrintableString, Bytes: []byte(formControls["stateEndEntity"].Text)}},    // S
+				{Type: asn1.ObjectIdentifier{2, 5, 4, 7}, Value: asn1.RawValue{Tag: asn1.TagPrintableString, Bytes: []byte(formControls["localityEndEntity"].Text)}}, // L
+				{Type: asn1.ObjectIdentifier{2, 5, 4, 10}, Value: asn1.RawValue{Tag: asn1.TagPrintableString, Bytes: []byte(formControls["orgEndEntity"].Text)}},     // O
+				{Type: asn1.ObjectIdentifier{2, 5, 4, 11}, Value: asn1.RawValue{Tag: asn1.TagPrintableString, Bytes: []byte(formControls["orgunitEndEntity"].Text)}}, // OU
+				{Type: asn1.ObjectIdentifier{2, 5, 4, 3}, Value: asn1.RawValue{Tag: asn1.TagPrintableString, Bytes: []byte(formControls["cnEndEntity"].Text)}},       // CN
+			},
 		}
+
 		numinterCAs := formControls["numinterCAs"].Text
 		if numinterCAs == "0" {
 			issuer = certRSA.Root.Subject
