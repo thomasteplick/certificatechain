@@ -25,11 +25,12 @@ import (
 )
 
 const (
-	certsDir       = "../../certs"
-	keysDir        = "../../private"
-	crlDir         = "../../crl"
-	openssl        = "C:\\Program Files\\OpenSSL-Win64\\bin\\openssl.exe"
-	trustChainPath = "trustChainECDSA.pem" // cat of CAs and End-entity certs
+	certsDir             = "../../certs"
+	keysDir              = "../../private"
+	crlDir               = "../../crl"
+	openssl              = "C:\\Program Files\\OpenSSL-Win64\\bin\\openssl.exe"
+	trustChainServerPath = "trustChainServerECDSA.pem" // cat of CAs and End-entity Server cert
+	trustChainClientPath = "trustChainClientECDSA.pem" // cat of CAs and End-entity Client cert
 )
 
 // ECDSA chain data
@@ -48,8 +49,9 @@ type ECDSAChain struct {
 	endentityECDSAkey     *ecdsa.PrivateKey
 }
 
-// trust chain file
-var trustChainFile *os.File
+// trust chain files, one for server, one for client
+var trustChainFileServer *os.File
+var trustChainFileClient *os.File
 
 // DisplayCertificate prints out the certificate
 func (chain *ECDSAChain) DisplayCertificate(pemfile string, w http.ResponseWriter) {
@@ -59,8 +61,10 @@ func (chain *ECDSAChain) DisplayCertificate(pemfile string, w http.ResponseWrite
 	const tmp = "temp.text"
 
 	switch pemfile {
-	case "endEntity.pem":
-		h3 = "End-entity Certificate"
+	case "endEntityServer.pem":
+		h3 = "End-entity Server Certificate"
+	case "endEntityClient.pem":
+		h3 = "End-entity Client Certificate"
 	case "inter1CA.pem":
 		h3 = "Intermediate1 Certificate Authority"
 	case "inter2CA.pem":
@@ -107,12 +111,12 @@ func (chain *ECDSAChain) DisplayCertificate(pemfile string, w http.ResponseWrite
 }
 
 // Create the End-entity certificate and private key and store them in the receiver chain
-func (chain *ECDSAChain) CreateEndEntity(w http.ResponseWriter, _ string) {
-	// Create End-entity CA private key
-	// Validate End-entity CA private key
-	// Create End-entity CA cert using Intermediate CA as signer
-	// Validate End-entity cert
-	// Save PEM form of cert and private key, Save DER form of private key
+func (chain *ECDSAChain) CreateEndEntity(w http.ResponseWriter, endEntity string) {
+	// Create End-entity private key for client or server
+	// Validate End-entity private key
+	// Create End-entity client or server cert using Intermediate CA as signer
+	// Validate End-entity client or server cert
+	// Save PEM form of client or server cert and private key, Save DER form of private key
 
 	endEntityKey, err := ecdsa.GenerateKey(chain.CurveEndEntity, rand.Reader)
 	if err != nil {
@@ -157,9 +161,10 @@ func (chain *ECDSAChain) CreateEndEntity(w http.ResponseWriter, _ string) {
 	}
 
 	// Save End-entity private key in DER form
-	f1, err := os.Create(path.Join(keysDir, "endEntitykey.der"))
+	keyDer := fmt.Sprintf("endEntity%sKey.der", endEntity)
+	f1, err := os.Create(path.Join(keysDir, keyDer))
 	if err != nil {
-		log.Fatalf("Create private key file %s error: %v\n", "endEntitykey.der", err)
+		log.Fatalf("Create private key file %s error: %v\n", keyDer, err)
 	}
 	defer f1.Close()
 
@@ -171,12 +176,13 @@ func (chain *ECDSAChain) CreateEndEntity(w http.ResponseWriter, _ string) {
 	if err != nil {
 		log.Fatalf("End-entity key DER Write error: %v\n", err)
 	}
-	fmt.Printf("Wrote %d bytes to %v\n", n, "endEntitykey.der")
+	fmt.Printf("Wrote %d bytes to %v\n", n, keyDer)
 
 	// Save End-entity private key in PEM form
-	f2, err := os.Create(path.Join(keysDir, "endEntitykey.pem"))
+	keyPem := fmt.Sprintf("endEntity%sKey.pem", endEntity)
+	f2, err := os.Create(path.Join(keysDir, keyPem))
 	if err != nil {
-		log.Fatalf("Create End-entity private key file %s error: %v\n", "endEntitykey.pem", err)
+		log.Fatalf("Create End-entity private key file %s error: %v\n", keyPem, err)
 	}
 
 	endEntityKeyBlock := &pem.Block{
@@ -191,9 +197,10 @@ func (chain *ECDSAChain) CreateEndEntity(w http.ResponseWriter, _ string) {
 	f2.Close()
 
 	// Save End-entity certificate in PEM form
-	f3, err := os.Create(path.Join(certsDir, "endEntity.pem"))
+	certPem := fmt.Sprintf("endEntity%s.pem", endEntity)
+	f3, err := os.Create(path.Join(certsDir, certPem))
 	if err != nil {
-		log.Fatalf("Create End-entity certificate file %s error: %v\n", "endEntity.pem", err)
+		log.Fatalf("Create End-entity certificate file %s error: %v\n", certPem, err)
 	}
 
 	endEntityCertBlock := &pem.Block{
@@ -203,24 +210,33 @@ func (chain *ECDSAChain) CreateEndEntity(w http.ResponseWriter, _ string) {
 
 	err = pem.Encode(f3, endEntityCertBlock)
 	if err != nil {
-		log.Fatalf("Write End-entity certificate %s error: %v\n", "endEntity.pem", err)
+		log.Fatalf("Write End-entity certificate %s error: %v\n", certPem, err)
 	}
 	f3.Close()
-	if f3, err = os.Open(path.Join(certsDir, "endEntity.pem")); err != nil {
-		log.Fatalf("Open End-entity certificate %s error: %v\n", "endEntity.pem", err)
+	if f3, err = os.Open(path.Join(certsDir, certPem)); err != nil {
+		log.Fatalf("Open End-entity certificate %s error: %v\n", certPem, err)
+	}
+
+	trustChainFile := trustChainFileServer
+	trustChainPath := trustChainServerPath
+	if endEntity == "Client" {
+		trustChainPath = trustChainClientPath
+		trustChainFile = trustChainFileClient
 	}
 
 	written, err := io.Copy(trustChainFile, f3)
 	if err != nil {
 		log.Fatalf("Write End-entity certificate to %s error: %v\n", trustChainPath, err)
 	}
+
 	f3.Close()
+
 	// Go the end of the file
-	trustChainFile.Seek(0, os.SEEK_END)
+	trustChainFile.Seek(0, io.SeekEnd)
 	fmt.Printf("Wrote %d bytes to %s\n", written, trustChainPath)
 
 	// Display the certificate in the web browser
-	chain.DisplayCertificate("endEntity.pem", w)
+	chain.DisplayCertificate(certPem, w)
 
 	// Create Certificate Revocation List (CRL) for End-entity certificate
 	templCRL := &x509.RevocationList{
@@ -236,9 +252,10 @@ func (chain *ECDSAChain) CreateEndEntity(w http.ResponseWriter, _ string) {
 	}
 
 	// Save End-entity CRL in PEM form
-	f4, err := os.Create(path.Join(crlDir, "endEntityCRL.crl"))
+	crl := fmt.Sprintf("endEntity%sCRL.crl", endEntity)
+	f4, err := os.Create(path.Join(crlDir, crl))
 	if err != nil {
-		log.Fatalf("Create End-entity CRL file %s error: %v\n", "endEntityCRL.crl", err)
+		log.Fatalf("Create End-entity CRL file %s error: %v\n", crl, err)
 	}
 	defer f4.Close()
 
@@ -267,7 +284,7 @@ func (chain *ECDSAChain) CreateEndEntity(w http.ResponseWriter, _ string) {
 	fmt.Printf("ECDSA keysize = %d\n", keysize)
 
 	// Create pkcs12 file with certificates and private key using openssl pkcs12
-	fileName := fmt.Sprintf("ecdsa%d.p12", keysize)
+	fileName := fmt.Sprintf("ecdsa%s%d.p12", endEntity, keysize)
 	absPath, err := exec.LookPath(openssl)
 	if err != nil {
 		fmt.Printf("openssl LookPath error: %v\n", err)
@@ -275,7 +292,7 @@ func (chain *ECDSAChain) CreateEndEntity(w http.ResponseWriter, _ string) {
 		fmt.Printf("%s is available and a pkcs12 file will be created.\n", absPath)
 		// openssl pkcs12 -export -descert -in ../../certs/trustChainECDSA.pem -inkey ../../private/server.key -out ../../certs/ecdsa.p12
 		cmd := exec.Command(absPath, "pkcs12", "-export", "-descert", "-in", path.Join(certsDir, trustChainPath),
-			"-inkey", path.Join(keysDir, "endEntitykey.pem"), "-out", path.Join(certsDir, fileName), "-passout", "pass:12345")
+			"-inkey", path.Join(keysDir, keyPem), "-out", path.Join(certsDir, fileName), "-passout", "pass:12345")
 		err = cmd.Run()
 		if err != nil {
 			fmt.Printf("openssl pkcs12 Command Run error: %v\n", err)
@@ -376,14 +393,25 @@ func (chain *ECDSAChain) CreateInterCA(w http.ResponseWriter) {
 			log.Fatalf("Open intermediate1 CA certificate %s error: %v\n", "inter1CA.pem", err)
 		}
 
-		written, err := io.Copy(trustChainFile, f3)
+		written, err := io.Copy(trustChainFileServer, f3)
 		if err != nil {
-			log.Fatalf("Write intermediate1 CA certificate to %s error: %v\n", trustChainPath, err)
+			log.Fatalf("Write intermediate1 CA certificate to %s error: %v\n", trustChainServerPath, err)
 		}
-		f3.Close()
-		fmt.Printf("Wrote %d bytes to %s\n", written, trustChainPath)
+		fmt.Printf("Wrote %d bytes to %s\n", written, trustChainServerPath)
 		// Go the end of the file
-		trustChainFile.Seek(0, os.SEEK_END)
+		trustChainFileServer.Seek(0, io.SeekEnd)
+
+		// Go to the start of the intermediate CA file
+		f3.Seek(0, io.SeekStart)
+
+		written, err = io.Copy(trustChainFileClient, f3)
+		if err != nil {
+			log.Fatalf("Write intermediate1 CA certificate to %s error: %v\n", trustChainClientPath, err)
+		}
+		fmt.Printf("Wrote %d bytes to %s\n", written, trustChainClientPath)
+		// Go the end of the trusted chain file
+		trustChainFileClient.Seek(0, io.SeekEnd)
+		f3.Close()
 
 		// Display the certificate in a web browser
 		chain.DisplayCertificate("inter1CA.pem", w)
@@ -498,19 +526,34 @@ func (chain *ECDSAChain) CreateInterCA(w http.ResponseWriter) {
 		if err != nil {
 			log.Fatalf("Write intermediate2 CA certificate to %s error: %v\n", "inter2CA.pem", err)
 		}
+
 		f3.Close()
+
 		if f3, err = os.Open(path.Join(certsDir, "inter2CA.pem")); err != nil {
 			log.Fatalf("Open intermediate2 CA certificate %s error: %v\n", "inter2CA.pem", err)
 		}
 
-		written, err := io.Copy(trustChainFile, f3)
+		written, err := io.Copy(trustChainFileServer, f3)
 		if err != nil {
-			log.Fatalf("Write intermediate2 CA certificate to %s error: %v\n", trustChainPath, err)
+			log.Fatalf("Write intermediate2 CA certificate to %s error: %v\n", trustChainServerPath, err)
 		}
-		f3.Close()
-		fmt.Printf("Wrote %d bytes to %s\n", written, trustChainPath)
+
+		fmt.Printf("Wrote %d bytes to %s\n", written, trustChainServerPath)
 		// Go the end of the file
-		trustChainFile.Seek(0, os.SEEK_END)
+		trustChainFileServer.Seek(0, io.SeekEnd)
+
+		// Go to the start of the inter CA file
+		f3.Seek(0, io.SeekStart)
+
+		written, err = io.Copy(trustChainFileClient, f3)
+		if err != nil {
+			log.Fatalf("Write intermediate2 CA certificate to %s error: %v\n", trustChainClientPath, err)
+		}
+		fmt.Printf("Wrote %d bytes to %s\n", written, trustChainClientPath)
+		// Go the end of the file
+		trustChainFileClient.Seek(0, io.SeekEnd)
+
+		f3.Close()
 
 		// Display the certificate
 		chain.DisplayCertificate("inter2CA.pem", w)
@@ -633,25 +676,45 @@ func (chain *ECDSAChain) CreateRootCA(w http.ResponseWriter) {
 	if err != nil {
 		log.Fatalf("Write root CA certificate %s error: %v\n", "rootCA.pem", err)
 	}
+
 	f3.Close()
+
 	if f3, err = os.Open(path.Join(certsDir, "rootCA.pem")); err != nil {
 		log.Fatalf("Open root CA certificate %s error: %v\n", "rootCA.pem", err)
 	}
+	defer f3.Close()
 
 	// Create trust chain file with CAs and End-entity certs
-	trustChainFile, err = os.Create(path.Join(certsDir, trustChainPath))
+	trustChainFileServer, err = os.Create(path.Join(certsDir, trustChainServerPath))
 	if err != nil {
-		log.Fatalf("Create trust chain file %s error: %v\n", trustChainPath, err)
+		log.Fatalf("Create trust chain file %s error: %v\n", trustChainServerPath, err)
 	}
 
-	written, err := io.Copy(trustChainFile, f3)
+	written, err := io.Copy(trustChainFileServer, f3)
 	if err != nil {
-		log.Fatalf("Write root CA certificate to %s error: %v\n", trustChainPath, err)
+		log.Fatalf("Write root CA certificate to %s error: %v\n", trustChainServerPath, err)
 	}
-	f3.Close()
-	fmt.Printf("Wrote %d bytes to %s\n", written, trustChainPath)
+	fmt.Printf("Wrote %d bytes to %s\n", written, trustChainServerPath)
 	// Go the end of the file
-	trustChainFile.Seek(0, os.SEEK_END)
+	trustChainFileServer.Seek(0, io.SeekEnd)
+
+	// Go the start of the root CA file
+	f3.Seek(0, io.SeekStart)
+
+	// Create trust chain file with CAs and client End-entity cert
+	trustChainFileClient, err = os.Create(path.Join(certsDir, trustChainClientPath))
+	if err != nil {
+		log.Fatalf("Create trust chain file %s error: %v\n", trustChainClientPath, err)
+	}
+
+	written, err = io.Copy(trustChainFileClient, f3)
+	if err != nil {
+		log.Fatalf("Write root CA certificate to %s error: %v\n", trustChainClientPath, err)
+	}
+
+	fmt.Printf("Wrote %d bytes to %s\n", written, trustChainClientPath)
+	// Go the end of the file
+	trustChainFileClient.Seek(0, io.SeekEnd)
 
 	// Display the certificate
 	chain.DisplayCertificate("rootCA.pem", w)
@@ -675,7 +738,8 @@ func GenerateCertChain(chain certchain.CertChain, w http.ResponseWriter) {
 	chain.CreateInterCA(w)
 
 	// Create the end-entity certificate and key
-	chain.CreateEndEntity(w, "server")
+	chain.CreateEndEntity(w, "Server")
+	chain.CreateEndEntity(w, "Client")
 
 	fmt.Fprint(w, `</body>`)
 	fmt.Fprint(w, `</html>`)
